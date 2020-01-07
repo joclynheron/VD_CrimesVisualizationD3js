@@ -1,0 +1,242 @@
+﻿<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<button id="button" onclick="update(1)">Population</button>
+<button id="button" onclick="update(2)">Violent crimes</button>
+<button id="button" onclick="update(3)">Murder</button>
+<button id="button" onclick="update(4)">Rape</button>
+<button id="button" onclick="update(5)">Robbery</button>
+<button id="button" onclick="update(6)">Aggravated assault</button>
+<button id="button" onclick="update(7)">Property crimes</button>
+<button id="button" onclick="update(8)">Burglary</button>
+<button id="button" onclick="update(9)">Larceny-theft</button>
+<button id="button" onclick="update(10)">Motor vehicle theft</button>
+<h1 id="selected"></h1>
+<div id="tooltip-container"></div>
+<div id="canvas-svg" style="margin-top: 4%; margin-left:15%"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/topojson/1.1.0/topojson.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+<script>
+    function update(column){
+        d3.select("svg").remove();
+        var config;
+    
+        switch(column) {
+            <!-- Population map -->
+            case 1:
+            config = {"color1":"#e6f0ff","color2":"#0066ff","stateDataColumn":"state","valueDataColumn":"population"};
+            document.getElementById("selected").textContent="Population in the United States in 2015";           
+            break;        
+            <!-- Violent crimes map -->
+            case 2:
+            config = {"color1":"#fff0e6","color2":"#660000","stateDataColumn":"state","valueDataColumn":"violent crime"};
+            document.getElementById("selected").textContent="Number of violent crimes per country in 2015 (rate per 100.000)";     
+            break;          
+            <!-- Murder map -->
+            case 3:
+            config = {"color1":"#ffffe6","color2":"#4d0000","stateDataColumn":"state","valueDataColumn":"murder"};
+            document.getElementById("selected").textContent="Murders per country in 2015 (rate per 100.000)";    
+            break;           
+            <!-- Rape map -->
+            case 4:
+            config = {"color1":"#f2e6ff","color2":"#330066","stateDataColumn":"state","valueDataColumn":"rape"};
+            document.getElementById("selected").textContent="Rapes by country in 2015 (rate per 100.000)";    
+            break;       
+            <!-- Robbery map -->
+            case 5:
+            config = {"color1":"#ccff66","color2":"#ff0000","stateDataColumn":"state","valueDataColumn":"robbery"};
+            document.getElementById("selected").textContent="Number of robberies per country in 2015 (rate per 100.000)";
+            break;       
+            <!-- Aggravated assault map -->
+            case 6:
+            config = {"color1":"#ecd9c6","color2":"#734d26","stateDataColumn":"state","valueDataColumn":"aggravated assault"};
+            document.getElementById("selected").textContent="Aggravated assaults per country in 2015 (rate per 100.000)";
+            break;     
+            <!-- Property crimes map -->
+            case 7:
+            config = {"color1":"#b8e600","color2":"#ff4d4d","stateDataColumn":"state","valueDataColumn":"property crime"};
+            document.getElementById("selected").textContent="Crimes on property per country in 2015 (rate per 100.000)";
+            break;      
+            <!-- Burglary map -->
+            case 8:
+            config = {"color1":"#fff5e6","color2":"#ffcc00","stateDataColumn":"state","valueDataColumn":"burglary"};
+            document.getElementById("selected").textContent="Number of burglaries per country in 2015 (rate per 100.000)";
+            break;      
+            <!-- Larceny-theft map -->
+            case 9:
+            config = {"color1":"#ffff33","color2":"#ff0000","stateDataColumn":"state","valueDataColumn":"larceny-theft"};
+            document.getElementById("selected").textContent="Number of larceny thefts per country in 2015 (rate per 100.000)";
+            break;     
+            <!-- Motor vehicle theft map -->
+            case 10:
+            config = {"color1":"#ffff33","color2":"#ff0000","stateDataColumn":"state","valueDataColumn":"motor vehicle theft"};
+            document.getElementById("selected").textContent="Number of motor vehicle stolen per country in 2015 (rate per 100.000)";
+            break;
+        }
+        draw(config);
+    }
+
+    function draw(config){
+        d3.csv("crimes_2015_share.csv", function(err, data) {  
+            var WIDTH = 1000, HEIGHT = 600;  
+            var COLOR_COUNTS = 50; 
+            var SCALE = 1.0;
+  
+            function Interpolate(start, end, steps, count) {
+                var s = start,
+                    e = end,
+                    final = s + (((e - s) / steps) * count);
+                return Math.floor(final);
+            }
+  
+            function Color(_r, _g, _b) {
+                var r, g, b;
+                var setColors = function(_r, _g, _b) {
+                    r = _r;
+                    g = _g;
+                    b = _b;
+                };
+                setColors(_r, _g, _b);
+                this.getColors = function() {
+                    var colors = {
+                        r: r,
+                        g: g,
+                        b: b
+                    };
+                    return colors;
+                };
+            }
+  
+            function hexToRgb(hex) {
+                var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : null;
+            }
+  
+            function valueFormat(d) {
+                if (d > 1000000000) {
+                    return Math.round(d / 1000000000 * 10) / 10 + "B";
+                } else if (d > 1000000) {
+                    return Math.round(d / 1000000 * 10) / 10 + "M";
+                } else if (d > 1000) {
+                    return Math.round(d / 1000 * 10) / 10 + "K";
+                } else {
+                    return d;
+                }
+            }
+  
+            var COLOR_FIRST = config.color1, COLOR_LAST = config.color2;  
+            var rgb = hexToRgb(COLOR_FIRST);
+            var COLOR_START = new Color(rgb.r, rgb.g, rgb.b);  
+            rgb = hexToRgb(COLOR_LAST);
+            var COLOR_END = new Color(rgb.r, rgb.g, rgb.b);  
+            var MAP_STATE = config.stateDataColumn;
+            var MAP_VALUE = config.valueDataColumn;  
+            var width = WIDTH,
+                height = HEIGHT;  
+            var valueById = d3.map();  
+            var startColors = COLOR_START.getColors(),
+                endColors = COLOR_END.getColors();  
+            var colors = [];
+  
+            for (var i = 0; i < COLOR_COUNTS; i++) {
+                var r = Interpolate(startColors.r, endColors.r, COLOR_COUNTS, i);
+                var g = Interpolate(startColors.g, endColors.g, COLOR_COUNTS, i);
+                var b = Interpolate(startColors.b, endColors.b, COLOR_COUNTS, i);
+                colors.push(new Color(r, g, b));
+            }
+  
+            var quantize = d3.scale.quantize()
+                .domain([0, 1.0])
+                .range(d3.range(COLOR_COUNTS).map(function(i) { return i }));
+  
+            var path = d3.geo.path();  
+            var svg = d3.select("#canvas-svg").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+  
+            d3.tsv("https://s3-us-west-2.amazonaws.com/vida-public/geo/us-state-names.tsv", function(error, names) {
+                name_id_map = {};
+                id_name_map = {};
+  
+                for (var i = 0; i < names.length; i++) {
+                    name_id_map[names[i].name] = names[i].id;
+                    id_name_map[names[i].id] = names[i].name;
+                }
+  
+                data.forEach(function(d) {
+                    var id = name_id_map[d[MAP_STATE]];
+                    valueById.set(id, +d[MAP_VALUE]); 
+                });
+  
+                quantize.domain([d3.min(data, function(d){ return +d[MAP_VALUE] }),
+                    d3.max(data, function(d){ return +d[MAP_VALUE] })]);  
+                d3.json("us.json", function(error, us) {
+                    svg
+                        .append("g")
+                        .attr("class", "states-choropleth")
+                        .selectAll("path")
+                        .data(topojson.feature(us, us.objects.states).features)
+                        .enter().append("path")
+                        .attr("transform", "scale(" + SCALE + ")")
+                        .style("fill", function(d) {
+                            if (valueById.get(d.id)) {
+                                var i = quantize(valueById.get(d.id));
+                                var color = colors[i].getColors();
+                                return "rgb(" + color.r + "," + color.g +
+                                    "," + color.b + ")";
+                            } else {
+                                return "";
+                            }
+                        })
+                        .attr("d", path)
+                        .on("mousemove", function(d) {
+                            var html = "";
+                            html += "<div class=\"tooltip_kv\">";
+                            html += "<span class=\"tooltip_key\">";
+                            html += id_name_map[d.id];
+                            html += "</span>";
+                            html += "<span class=\"tooltip_value\">";
+                            html += (valueById.get(d.id) ? valueFormat(valueById.get(d.id)) : "");
+                            html += "";
+                            html += "</span>";
+                            html += "</div>";
+            
+                            $("#tooltip-container").html(html);
+                            $(this).attr("fill-opacity", "0.8");
+                            $("#tooltip-container").show();
+            
+                            var coordinates = d3.mouse(this);            
+                            var map_width = $('.states-choropleth')[0].getBoundingClientRect().width;
+            
+                            if (d3.event.layerX < map_width / 2) {
+                                d3.select("#tooltip-container")
+                                    .style("top", (d3.event.layerY + 15) + "px")
+                                    .style("left", (d3.event.layerX + 15) + "px");
+                            } else {
+                                var tooltip_width = $("#tooltip-container").width();
+                                d3.select("#tooltip-container")
+                                    .style("top", (d3.event.layerY + 15) + "px")
+                                    .style("left", (d3.event.layerX - tooltip_width - 30) + "px");
+                            }
+                        })
+                        .on("mouseout", function() {
+                            $(this).attr("fill-opacity", "1.0");
+                            $("#tooltip-container").hide();
+                        });  
+                    svg.append("path")
+                        .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+                        .attr("class", "states")
+                        .attr("transform", "scale(" + SCALE + ")")
+                        .attr("d", path);
+                });
+            });
+        });
+    }
+</script>
